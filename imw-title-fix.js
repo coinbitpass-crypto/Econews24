@@ -1,88 +1,82 @@
+<script>
 (function(){
+
   var SLASH_RE = /[\/／⁄∕]/;
 
-  function split(raw){
-    return (raw||'')
-      .replace(/\s+/g,' ')
+  function splitParts(raw){
+    return (raw || '')
       .trim()
       .split(SLASH_RE)
       .map(function(s){ return s.trim(); })
       .filter(Boolean);
   }
 
-  // 목록: 메인만
-  function applyList(){
-    var spans = document.querySelectorAll('.list_text_title .tit a.title_link > span');
+  function escapeHtml(str){
+    return str.replace(/[&<>"']/g, function(m){
+      return ({
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        '"':'&quot;',
+        "'":'&#39;'
+      })[m];
+    });
+  }
 
+  // ✅ 목록: 제목을 "메인"만 남기기
+  function applyListTitle(){
+    var spans = document.querySelectorAll('.list_text_title .tit a.title_link > span');
     for(var i=0;i<spans.length;i++){
       var sp = spans[i];
+      if(sp.dataset.imwMainOnly === '1') continue;
+
       var raw = (sp.textContent || '').trim();
       if(!raw) continue;
 
-      var p = split(raw);
-      if(p.length < 2) continue;
+      var parts = splitParts(raw);
+      if(parts.length < 2) continue;
 
-      sp.textContent = p[0];
+      sp.textContent = parts[0];
+      sp.dataset.imwMainOnly = '1';
     }
   }
 
-  // 상세: 3줄 분리
-  function applyView(){
-    var t = document.querySelector('.board_view .header .view_tit');
-    if(!t) return;
+  // ✅ 상세: 3줄 분리
+  function splitBoardTitle(){
+    if(!document.querySelector('.board_view')) return;
 
-    // 이미 가공된 상태면 스킵
-    if(t.querySelector('.t-main')) return;
+    var tit = document.querySelector('.board_view .header .view_tit');
+    if(!tit) return;
 
-    var raw = (t.textContent || '').trim();
+    if(tit.classList.contains('imw-split-title')) return;
+
+    var raw = (tit.textContent || '').trim();
     if(!raw) return;
 
-    var p = split(raw);
-    if(p.length < 2) return;
+    var parts = splitParts(raw);
+    if(parts.length < 2) return;
 
-    t.innerHTML =
-      '<span class="t-main">'+p[0]+'</span>'+
-      (p[1]?'<span class="t-sub-top">'+p[1]+'</span>':'')+
-      (p[2]?'<span class="t-sub-bottom">'+p[2]+'</span>':'');
+    var main = parts[0] || '';
+    var sub1 = parts[1] || '';
+    var sub2 = parts[2] || '';
+
+    tit.innerHTML =
+      '<span class="t-main">' + escapeHtml(main) + '</span>' +
+      (sub1 ? '<span class="t-sub-top">' + escapeHtml(sub1) + '</span>' : '') +
+      (sub2 ? '<span class="t-sub-bottom">' + escapeHtml(sub2) + '</span>' : '');
+
+    tit.classList.add('imw-split-title');
   }
 
   function run(){
-    applyList();
-    applyView();
+    applyListTitle();
+    splitBoardTitle();
   }
 
-  // 늦게 렌더되는 경우 대비: 딱 3번만(가볍게)
-  function runSoon(){
-    run();
-    setTimeout(run, 200);
-    setTimeout(run, 800);
-  }
-
-  // 최초
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', runSoon);
-  } else {
-    runSoon();
-  }
-
-  // 내부 이동 대응
-  window.addEventListener('popstate', function(){ runSoon(); });
-
-  // pushState/replaceState 훅
-  ['pushState','replaceState'].forEach(function(fn){
-    var orig = history[fn];
-    if(!orig) return;
-    history[fn] = function(){
-      var ret = orig.apply(this, arguments);
-      runSoon();
-      return ret;
-    };
-  });
-
-  // 사용자 클릭 후(카테고리/페이지네이션/검색 등) 한 번만 재적용
-  document.addEventListener('click', function(){
-    setTimeout(run, 50);
-    setTimeout(run, 300);
-  }, true);
+  // ✅ 무난하게: 로드 직후 + 살짝 지연 2번 (끝)
+  run();
+  setTimeout(run, 300);
+  setTimeout(run, 800);
 
 })();
+</script>
