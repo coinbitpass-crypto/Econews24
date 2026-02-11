@@ -1,5 +1,4 @@
 (function(){
-
   var SLASH_RE = /[\/／⁄∕]/;
 
   function split(raw){
@@ -11,34 +10,29 @@
       .filter(Boolean);
   }
 
+  // 목록: 메인만
   function applyList(){
     var spans = document.querySelectorAll('.list_text_title .tit a.title_link > span');
 
     for(var i=0;i<spans.length;i++){
       var sp = spans[i];
-
-      // 이미 처리했으면 스킵
-      if(sp.dataset.imwMainOnly === '1') continue;
-
       var raw = (sp.textContent || '').trim();
       if(!raw) continue;
 
       var p = split(raw);
       if(p.length < 2) continue;
 
-      // 원문 저장 + 메인만 표시
-      sp.dataset.raw = raw;
       sp.textContent = p[0];
-      sp.dataset.imwMainOnly = '1';
     }
   }
 
+  // 상세: 3줄 분리
   function applyView(){
     var t = document.querySelector('.board_view .header .view_tit');
     if(!t) return;
 
-    // 이미 처리했으면 스킵
-    if(t.classList.contains('imw-split-title')) return;
+    // 이미 가공된 상태면 스킵
+    if(t.querySelector('.t-main')) return;
 
     var raw = (t.textContent || '').trim();
     if(!raw) return;
@@ -50,8 +44,6 @@
       '<span class="t-main">'+p[0]+'</span>'+
       (p[1]?'<span class="t-sub-top">'+p[1]+'</span>':'')+
       (p[2]?'<span class="t-sub-bottom">'+p[2]+'</span>':'');
-
-    t.classList.add('imw-split-title');
   }
 
   function run(){
@@ -59,26 +51,38 @@
     applyView();
   }
 
-  // ✅ 디바운스(연속 DOM 변경 한 번으로 묶기)
-  var scheduled = false;
-  function schedule(){
-    if(scheduled) return;
-    scheduled = true;
-    requestAnimationFrame(function(){
-      scheduled = false;
-      run();
-    });
-  }
-
-  // 최초 실행
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', run);
-  } else {
+  // 늦게 렌더되는 경우 대비: 딱 3번만(가볍게)
+  function runSoon(){
     run();
+    setTimeout(run, 200);
+    setTimeout(run, 800);
   }
 
-  // DOM 변경 감지(필요할 때만 schedule)
-  var mo = new MutationObserver(schedule);
-  mo.observe(document.documentElement, { subtree:true, childList:true });
+  // 최초
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', runSoon);
+  } else {
+    runSoon();
+  }
+
+  // 내부 이동 대응
+  window.addEventListener('popstate', function(){ runSoon(); });
+
+  // pushState/replaceState 훅
+  ['pushState','replaceState'].forEach(function(fn){
+    var orig = history[fn];
+    if(!orig) return;
+    history[fn] = function(){
+      var ret = orig.apply(this, arguments);
+      runSoon();
+      return ret;
+    };
+  });
+
+  // 사용자 클릭 후(카테고리/페이지네이션/검색 등) 한 번만 재적용
+  document.addEventListener('click', function(){
+    setTimeout(run, 50);
+    setTimeout(run, 300);
+  }, true);
 
 })();
