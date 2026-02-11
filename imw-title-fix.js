@@ -11,46 +11,74 @@
       .filter(Boolean);
   }
 
-  function list(){
-    document
-      .querySelectorAll('.list_text_title .tit a.title_link > span')
-      .forEach(function(sp){
+  function applyList(){
+    var spans = document.querySelectorAll('.list_text_title .tit a.title_link > span');
 
-        if(!sp.dataset.raw){
-          sp.dataset.raw = sp.textContent.trim();
-        }
+    for(var i=0;i<spans.length;i++){
+      var sp = spans[i];
 
-        var p = split(sp.dataset.raw);
-        if(p.length>1) sp.textContent = p[0];
-      });
+      // 이미 처리했으면 스킵
+      if(sp.dataset.imwMainOnly === '1') continue;
+
+      var raw = (sp.textContent || '').trim();
+      if(!raw) continue;
+
+      var p = split(raw);
+      if(p.length < 2) continue;
+
+      // 원문 저장 + 메인만 표시
+      sp.dataset.raw = raw;
+      sp.textContent = p[0];
+      sp.dataset.imwMainOnly = '1';
+    }
   }
 
-  function view(){
+  function applyView(){
     var t = document.querySelector('.board_view .header .view_tit');
     if(!t) return;
 
-    if(!t.dataset.raw){
-      t.dataset.raw = t.textContent.trim();
-    }
+    // 이미 처리했으면 스킵
+    if(t.classList.contains('imw-split-title')) return;
 
-    var p = split(t.dataset.raw);
-    if(p.length<2) return;
+    var raw = (t.textContent || '').trim();
+    if(!raw) return;
+
+    var p = split(raw);
+    if(p.length < 2) return;
 
     t.innerHTML =
       '<span class="t-main">'+p[0]+'</span>'+
       (p[1]?'<span class="t-sub-top">'+p[1]+'</span>':'')+
       (p[2]?'<span class="t-sub-bottom">'+p[2]+'</span>':'');
+
+    t.classList.add('imw-split-title');
   }
 
   function run(){
-    list();
-    view();
+    applyList();
+    applyView();
   }
 
-  var mo = new MutationObserver(run);
-  mo.observe(document.documentElement,{subtree:true,childList:true});
+  // ✅ 디바운스(연속 DOM 변경 한 번으로 묶기)
+  var scheduled = false;
+  function schedule(){
+    if(scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(function(){
+      scheduled = false;
+      run();
+    });
+  }
 
-  setInterval(run,500);
+  // 최초 실행
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', run);
+  } else {
+    run();
+  }
 
-  document.addEventListener('DOMContentLoaded',run);
+  // DOM 변경 감지(필요할 때만 schedule)
+  var mo = new MutationObserver(schedule);
+  mo.observe(document.documentElement, { subtree:true, childList:true });
+
 })();
