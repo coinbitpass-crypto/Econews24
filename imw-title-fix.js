@@ -1,66 +1,69 @@
+<script>
 (function(){
 
-  var SLASH_RE = /[\/／⁄∕]/;
-
-  function split(raw){
-    return (raw||'')
-      .replace(/\s+/g,' ')
-      .trim()
-      .split(SLASH_RE)
-      .map(function(s){ return s.trim(); })
-      .filter(Boolean);
+  function escapeHtml(str){
+    return str.replace(/[&<>"']/g, function(m){
+      return ({
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        '"':'&quot;',
+        "'":'&#39;'
+      })[m];
+    });
   }
 
-  // ✅ 목록: a.title_link 직접 처리
-  function applyList(){
-    var links = document.querySelectorAll('.list_text_title .tit a.title_link');
-
-    for(var i=0;i<links.length;i++){
-      var a = links[i];
-
-      // 이미 처리했으면 스킵
-      if(a.dataset.imwMainOnly === '1') continue;
-
-      var raw = (a.textContent || '').trim();
-      if(!raw) continue;
-
-      var p = split(raw);
-      if(p.length < 2) continue;
-
-      a.textContent = p[0];
-      a.dataset.imwMainOnly = '1';
-    }
+  function isViewPage(){
+    // 상세 페이지에만 있는 클래스
+    return !!document.querySelector('.board_view');
   }
 
-  // ✅ 상세: 3줄 분리
-  function applyView(){
-    var t = document.querySelector('.board_view .header .view_tit');
-    if(!t) return;
+  function apply(){
 
-    if(t.classList.contains('imw-split-title')) return;
+    // 목록이면 무조건 종료
+    if(!isViewPage()) return;
 
-    var raw = (t.textContent || '').trim();
+    var tit = document.querySelector('.board_view .header .view_tit');
+    if(!tit) return;
+
+    if(tit.classList.contains('imw-split-title')) return;
+
+    var raw = (tit.textContent || '').trim();
     if(!raw) return;
 
-    var p = split(raw);
-    if(p.length < 2) return;
+    // 모든 슬래시 대응
+    var parts = raw.split(/[\/／⁄∕]/)
+      .map(s => s.trim())
+      .filter(Boolean);
 
-    t.innerHTML =
-      '<span class="t-main">'+p[0]+'</span>'+
-      (p[1]?'<span class="t-sub-top">'+p[1]+'</span>':'')+
-      (p[2]?'<span class="t-sub-bottom">'+p[2]+'</span>':'');
+    if(parts.length < 2) return;
 
-    t.classList.add('imw-split-title');
+    // 메인 / 서브 / 작은서브
+    var main = parts[0] || '';
+    var sub1 = parts[1] || '';
+    var sub2 = parts[2] || '';
+
+    tit.innerHTML =
+      '<span class="t-main">' + escapeHtml(main) + '</span>' +
+      (sub1 ? '<span class="t-sub-top">' + escapeHtml(sub1) + '</span>' : '') +
+      (sub2 ? '<span class="t-sub-bottom">' + escapeHtml(sub2) + '</span>' : '');
+
+    tit.classList.add('imw-split-title');
   }
 
-  function run(){
-    applyList();
-    applyView();
-  }
+  // 최초
+  apply();
 
-  // ✅ 최소 실행 (UI 영향 없음)
-  run();
-  setTimeout(run, 300);
-  setTimeout(run, 800);
+  // AJAX 이동 대비
+  var timer = setInterval(apply, 300);
+  setTimeout(()=>clearInterval(timer), 10000);
+
+  // DOM 변경 감지
+  var mo = new MutationObserver(apply);
+  mo.observe(document.body,{
+    childList:true,
+    subtree:true
+  });
 
 })();
+</script>
